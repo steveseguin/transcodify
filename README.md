@@ -92,3 +92,10 @@ A powerful browser-based JavaScript code obfuscation tool that helps protect you
 ## Technical Details
 
 This tool uses the [javascript-obfuscator](https://github.com/javascript-obfuscator/javascript-obfuscator) library and runs entirely in your browser.
+
+## Regression tests
+
+Run `node --test tests/beautify.test.cjs` with Node.js 18 or newer. The tests use
+the local formatter and actual application handlers with a mocked DOM, and
+compile fixtures without executing submitted code. They do not replace real
+browser testing. Formatter provenance is recorded in `vendor/README.md`.
