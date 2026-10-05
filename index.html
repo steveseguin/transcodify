@@ -17,6 +17,9 @@
     <link rel="canonical" href="https://transcodify.com">
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjMWUxZTJlIiByeD0iNCIvPjxwYXRoIGZpbGw9IiM4OWI0ZmEiIGQ9Ik04IDcgTDEyIDcgTDEyIDI1IEw4IDI1IFoiLz48cGF0aCBmaWxsPSIjYTZlM2ExIiBkPSJNMTQgMTYgTDI0IDcgTDI0IDEyIEwxNyAxOCBMMjQgMjQgTDI0IDI3IFoiLz48L3N2Zz4=">
     <script src="obfuscate.js"></script>
+    <script src="vendor/prettier-3.9.9.js"></script>
+    <script src="vendor/prettier-babel-3.9.9.js"></script>
+    <script src="vendor/prettier-estree-3.9.9.js"></script>
     <style>
         :root {
             --bg-primary: #1e1e2e;
@@ -1124,52 +1127,31 @@ function loadSettingsFromLocalStorage() {
     }
 }
 
- function beautifyCode(inputElement = outputCode) {
+ const formatRequests = new WeakMap();
+ async function beautifyCode(inputElement = outputCode) {
+    const original = inputElement.value;
+    const request = {};
+    formatRequests.set(inputElement, request);
  	const code = inputElement.value.trim();
  	if (!code) {
  		showNotification(`No code to beautify`, 'error');
  		return;
  	}
  	try {
- 		let result = '';
- 		let indentLevel = 0;
- 		let inString = false;
- 		let stringChar = '';
- 		let escaped = false;
- 		for (let i = 0; i < code.length; i++) {
- 			const char = code[i];
- 			const nextChar = code[i + 1] || '';
- 			if ((char === '"' || char === "'" || char === '`') && !escaped) {
- 				if (inString && char === stringChar) {
- 					inString = false;
- 				} else if (!inString) {
- 					inString = true;
- 					stringChar = char;
- 				}
- 			}
- 			escaped = char === '\\' && !escaped;
- 			if (!inString) {
- 				if (char === '{' || char === '[') {
- 					result += char;
- 					indentLevel++;
- 					result += '\n' + ' '.repeat(indentLevel * 4);
- 					continue;
- 				} else if (char === '}' || char === ']') {
- 					indentLevel--;
- 					result += '\n' + ' '.repeat(indentLevel * 4) + char;
- 					continue;
- 				} else if (char === ';') {
- 					result += char;
- 					result += '\n' + ' '.repeat(indentLevel * 4);
- 					continue;
- 				} else if (char === ',' && (nextChar !== '\n' && nextChar !== ' ')) {
- 					result += char;
- 					result += '\n' + ' '.repeat(indentLevel * 4);
- 					continue;
- 				}
- 			}
- 			result += char;
- 		}
+        if (typeof prettier === 'undefined' || typeof prettier.format !== 'function' ||
+            typeof prettierPlugins === 'undefined' || !prettierPlugins.babel || !prettierPlugins.estree) {
+            throw new Error('Formatter unavailable; code has not been changed');
+        }
+        const result = await prettier.format(original, {
+            parser: 'babel',
+            plugins: [prettierPlugins.babel, prettierPlugins.estree],
+            tabWidth: 4
+        });
+        if (formatRequests.get(inputElement) !== request) return;
+        if (inputElement.value !== original) {
+            showNotification('Code changed while formatting; please try again', 'error');
+            return;
+        }
  		inputElement.value = result;
  		if (inputElement === inputCode) {
  			updateLineNumbers(inputCode, inputLineNumbers);
@@ -1180,7 +1162,9 @@ function loadSettingsFromLocalStorage() {
  		}
  		showNotification('Code beautified');
  	} catch (error) {
- 		showNotification(`Error beautifying code: ${error.message}`, 'error');
+ 		if (formatRequests.get(inputElement) === request) {
+            showNotification(`Error beautifying code: ${error.message}`, 'error');
+        }
  	}
  }
  window.addEventListener('load', initUI);
